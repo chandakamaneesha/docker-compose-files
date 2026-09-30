@@ -1,0 +1,71 @@
+---
+services:
+  frontend:
+    container_name: cont1
+    image: shaikmustafa/dm
+    ports:
+      - "1111:80"
+    networks:
+      - network1
+    volumes:
+      - volume1:/mani/
+    env_file:
+      - dev.env
+    deploy:
+      resources:
+        reservations:
+          cpus: "0.5"
+          memory: 100M
+        limits:
+          cpus: "1.0"
+          memory: 200M
+
+  backend:
+    container_name: cont2
+    image: shaikmustafa/cycle
+    ports:
+      - "1112:80"
+    networks:
+      - network2
+    volumes:
+      - volume2:/reha/
+    deploy:
+      resources:
+        reservations:
+          cpus: "0.5"
+          memory: 100M
+        limits:
+          cpus: "1.0"
+          memory: 200M
+
+  database:
+    container_name: cont3
+    image: shaikmustafa/mygame
+    ports:
+      - "1113:80"
+    networks:
+      - network3
+    volumes:
+      - volume3:/sai/
+    deploy:
+      resources:
+        reservations:
+          cpus: "0.5"
+          memory: 100M
+        limits:
+          cpus: "1.0"
+          memory: 200M
+
+networks:
+  network1:
+    driver: bridge
+  network2:
+    driver: bridge
+  network3:
+    driver: bridge
+
+volumes:
+  volume1:
+  volume2:
+  volume3:
+                                                                                                                                                       1,1           Top
