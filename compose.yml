@@ -11,6 +11,7 @@ services:
       - volume1:/mani/
     env_file:
       - dev.env
+    restart: unless-stopped
     deploy:
       resources:
         reservations:
@@ -29,6 +30,7 @@ services:
       - network2
     volumes:
       - volume2:/reha/
+    restart: always
     deploy:
       resources:
         reservations:
