@@ -1,0 +1,59 @@
+pipeline {
+    agent any
+    tools {
+        maven "mymaven"
+    }
+    stages {
+        stage('code') {
+            steps {
+                git 'https://github.com/chandakamaneesha/dockerwebapp.git'
+            }
+        }
+        stage('build') {
+            steps {
+                sh "mvn clean install"
+            }
+        }
+        stage('CQA') {
+            steps{
+                withSonarQubeEnv('mysonar') {
+                    sh "mvn clean verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=webapp-project -Dsonar.projectName='webapp-project'"
+                }
+            }
+        }
+        stage('Quality Gates') {
+            steps {
+                waitForQualityGate abortPipeline: true, credentialsId: 'sonar-password'
+            }
+        }
+        stage('Artifact'){
+            steps {
+                script {
+                    def pom = readMavenPom file: 'pom.xml'
+                    nexusArtifactUploader(artifacts: [[artifactId: pom.artifactId, classifier: '', file: "target/${pom.artifactId}-${pom.version}.war", type: 'war']], credentialsId: 'nexus', groupId: pom.groupId, nexusUrl: '16.178.42.20:8081', nexusVersion: 'nexus3', protocol: 'http', repository: 'webapplication', version: pom.version)
+                }
+            }
+        }
+        stage('Images') {
+            steps {
+                sh '''
+                    docker build -t appimage -f Docker-app/Dockerfile .
+                    docker build -t dbimage -f Docker-db/Dockerfile .
+                '''
+            }
+        }
+        stage('Trivy') {
+            steps {
+                sh '''
+                    trivy image appimage:latest
+                    trivy image dbimage:latest
+                '''
+            }
+        }
+        stage("Compose"){
+            steps {
+                sh "docker-compose up -d"
+            }
+        }
+    }
+}
