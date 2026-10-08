@@ -1,0 +1,74 @@
+pipeline {
+    agent {
+        node {
+            label 'prod'
+        }
+    }
+    tools {
+        maven 'mymaven'
+    }
+    stages {
+        stage('Code') {
+            steps {
+                git 'https://github.com/chandakamaneesha/dockerwebapp.git'
+            }
+        }
+        stage('Build') {
+            steps {
+                sh 'mvn clean install'
+            }
+        }
+        stage('CQA') {
+            steps {
+                withSonarQubeEnv('mysonar') {
+                    sh "mvn clean verify org.sonarsource.scanner.maven:sonar-maven-plugin:sonar -Dsonar.projectKey=myProject"
+                }
+            }
+        }
+        stage('Quality Gate'){
+            steps {
+                waitForQualityGate abortPipeline: true, credentialsId: 'sonar-password'
+            }
+        }
+        stage('Artifact'){
+            steps {
+                nexusArtifactUploader artifacts: [[artifactId: 'vprofile', classifier: '', file: 'target/vprofile-v2.war', type: 'war']], credentialsId: 'nexus', groupId: 'com.visualpathit', nexusUrl: '54.252.220.31:8081/', nexusVersion: 'nexus3', protocol: 'http', repository: 'myrepo', version: 'v2'
+            }
+        }
+        stage('Images') {
+            steps {
+                sh '''
+                cp -r target Docker-app
+                docker build -t appimage Docker-app
+                docker build -t dbimage Docker-db
+                '''
+            }
+        }
+        stage('Image scan') {
+            steps {
+                sh '''
+                trivy image appimage >> app-image.txt
+                trivy image dbimage >> db-image.txt
+                '''
+            }
+        }
+        stage('Docker registry') {
+            steps {
+                script {
+                    withDockerRegistry(credentialsId: 'dockerhub') {
+                        sh 'docker tag appimage maneesha3/myapp:webapp'
+                        sh 'docker tag dbimage maneesha3/myapp:db'
+                        sh 'docker push maneesha3/myapp:webapp'
+                        sh 'docker push maneesha3/myapp:webapp'
+                    }
+                }
+                
+            }
+        }
+        stage('Deploy') {
+            steps {
+                sh 'docker stack deploy myapp --compose-file=compose.yml'
+            }
+        }
+    }
+}
