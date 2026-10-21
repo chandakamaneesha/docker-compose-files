@@ -1,1 +1,70 @@
 
+pipeline {
+    agent any
+    stages {
+        stage('Code') {
+            steps {
+                git 'https://github.com/chandakamaneesha/python-code-library-app.git'
+            }
+        }
+        stage('CQA') {
+            steps {
+                //def scannerHome = tool 'mysonar';
+                withSonarQubeEnv('mysonar') {
+                    sh "${tool 'mysonar'}/bin/sonar-scanner"
+                    
+                }
+            }
+        }
+        stage ('QG') {
+            steps {
+                waitForQualityGate abortPipeline: true, credentialsId: 'sonar'
+            }
+        }
+        stage('Images') {
+            steps{
+                sh '''
+               docker build -t authimage auth
+               docker build -t bookimage book
+               docker build -t borrowimage borrow
+               docker build -t dbimage database
+               docker build -t frontimage .
+            '''
+                
+            }
+        }
+        stage('Trivy scan') {
+            steps {
+                sh '''
+                  trivy image authimage >> auth-image.txt
+                  trivy image bookimage >> book-image.txt
+                  trivy image borrowimage >> borrow-image.txt
+                  trivy image dbimage >> db-image.txt
+                  trivy image frontimage >> front-image.txt
+                '''
+            }
+        }
+        stage('Registry'){
+            steps {
+                script{
+                    withDockerRegistry(credentialsId: 'dockerhub') {
+                    sh '''
+                      docker tag authimage maneesha3/pythonapp:auth
+                      docker tag  bookimage maneesha3/pythonapp:book
+                      docker tag  borrowimage maneesha3/pythonapp:borrow
+                      docker tag  dbimage maneesha3/pythonapp:db
+                      docker tag  frontimage maneesha3/pythonapp:front
+                      docker push maneesha3/pythonapp:auth
+                      docker push maneesha3/pythonapp:book
+                      docker push maneesha3/pythonapp:borrow
+                      docker push maneesha3/pythonapp:db
+                      docker push maneesha3/pythonapp:front
+                    '''
+                        
+                    }
+                    
+                }
+            }
+        }
+    }
+}
